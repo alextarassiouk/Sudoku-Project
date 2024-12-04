@@ -18,7 +18,7 @@ class Cell:
         self.temp_value = value
 
     def draw(self, screen):
-        font = pygame.font.SysFont("comicsans", 40)
+        font = pygame.font.SysFont("timesnewroman", 40)
         gap = self.width / 9
         x = self.col * gap
         y = self.row * gap
