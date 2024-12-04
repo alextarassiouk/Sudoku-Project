@@ -1,80 +1,56 @@
-import math,random
-
 class SudokuGenerator:
-    def __init__(self, row_length, removed_cells):
-        self.row_length = row_length
-        self.removed_cells = removed_cells
-        self.board = [[0 for _ in range(row_length)] for _ in range(row_length)]
-        self.box_length = int(row_length ** 0.5)
+    def __init__(self, width, height, difficulty):
+        self.width = width
+        self.height = height
+        self.difficulty = difficulty
+        self.board = [[0 for _ in range(width)] for _ in range(height)]
+        self.box_length = int(height ** 0.5)  # Assuming a square grid (e.g., 9x9 grid => box_length is 3)
+        self.fill_values()
 
-    def get_board(self):
-        return self.board
+    def is_safe(self, row, col, num):
+        # Check the row for duplicates
+        if num in self.board[row]:
+            return False
 
-    def print_board(self):
-        for row in self.board:
-            print(row)
+        # Check the column for duplicates
+        for r in range(len(self.board)):
+            if self.board[r][col] == num:
+                return False
 
-    def valid_in_row(self, row, num):
-        return num not in self.board[row]
+        # Check the 3x3 box for duplicates
+        start_row = (row // self.box_length) * self.box_length
+        start_col = (col // self.box_length) * self.box_length
 
-    def valid_in_col(self, col, num):
-        return all(self.board[i][col] != num for i in range(self.row_length))
-
-    def valid_in_box(self, row_start, col_start, num):
-        for i in range(self.box_length):
-            for j in range(self.box_length):
-                if self.board[row_start + i][col_start + j] == num:
+        for r in range(start_row, start_row + self.box_length):
+            for c in range(start_col, start_col + self.box_length):
+                if self.board[r][c] == num:
                     return False
+
         return True
 
-    def is_valid(self, row, col, num):
-        return (self.valid_in_row(row, num) and
-                self.valid_in_col(col, num) and
-                self.valid_in_box(row - row % self.box_length, col - col % self.box_length, num))
-
-    def fill_box(self, row_start, col_start):
-        nums = list(range(1, self.row_length + 1))
-        random.shuffle(nums)
-        for i in range(self.box_length):
-            for j in range(self.box_length):
-                self.board[row_start + i][col_start + j] = nums.pop()
-
-    def fill_diagonal(self):
-        for i in range(0, self.row_length, self.box_length):
-            self.fill_box(i, i)
+    def fill_values(self):
+        # This function starts the process of filling the board
+        self.fill_remaining(0, 0)
 
     def fill_remaining(self, row, col):
-        if row == self.row_length and col == 0:
+        # This method recursively tries to fill the board
+        if row >= len(self.board):  # If row goes beyond the grid, we have completed the board
             return True
-        if col >= self.row_length:
-            row += 1
-            col = 0
-        if self.board[row][col] != 0:
+        if col >= len(self.board[row]):  # If column goes beyond the row length, move to the next row
+            return self.fill_remaining(row + 1, 0)
+        if self.board[row][col] != 0:  # Skip already filled cells
             return self.fill_remaining(row, col + 1)
-        for num in range(1, self.row_length + 1):
-            if self.is_valid(row, col, num):
+
+        # Try numbers 1 to 9
+        for num in range(1, 10):
+            if self.is_safe(row, col, num):  # Check if placing num is safe
                 self.board[row][col] = num
-                if self.fill_remaining(row, col + 1):
+                if self.fill_remaining(row, col + 1):  # Move to the next cell
                     return True
-                self.board[row][col] = 0
+                self.board[row][col] = 0  # Backtrack if placing num didn't work
+
         return False
 
-    def fill_values(self):
-        self.fill_diagonal()
-        self.fill_remaining(0, self.box_length)
-
-    def remove_cells(self):
-        total_cells = self.row_length ** 2
-        for _ in range(self.removed_cells):
-            cell = random.randint(0, total_cells - 1)
-            row, col = divmod(cell, self.row_length)
-            while self.board[row][col] == 0:
-                cell = random.randint(0, total_cells - 1)
-                row, col = divmod(cell, self.row_length)
-            self.board[row][col] = 0
-
-def generate_sudoku(size, removed):
-    generator = SudokuGenerator(size, removed)
-    generator.fill_values()
-    generator.remove_cells()
-    return generator.get_board()
+def generate_sudoku(width, height, difficulty):
+    generator = SudokuGenerator(width, height, difficulty)
+    return generator.board
