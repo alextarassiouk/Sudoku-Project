@@ -1,65 +1,77 @@
 import pygame
 import random
 
-# Cell Class
-class Cell:
-    def __init__(self, value, row, col, width, height):
-        self.value = value
-        self.sketched_value = 0
-        self.row = row
-        self.col = col
+# Initialize Pygame and the font module
+pygame.init()
+pygame.font.init()
+
+# Constants
+WIDTH = 540
+HEIGHT = 600  # Increased height to fit buttons
+ROWS, COLS = 9, 9
+CELL_SIZE = WIDTH // COLS
+BUTTON_WIDTH = 200
+BUTTON_HEIGHT = 60
+BUTTON_COLOR = (100, 150, 255)
+BUTTON_HOVER_COLOR = (50, 100, 255)
+TEXT_COLOR = (255, 255, 255)
+FONT = pygame.font.SysFont("comicsans", 40)
+LARGE_FONT = pygame.font.SysFont("comicsans", 60)
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+BACKGROUND_COLOR = (30, 30, 30)
+
+# Game screen
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Sudoku Game")
+
+# Button Class
+class Button:
+    def __init__(self, text, x, y, width, height, color, hover_color, action=None):
+        self.text = text
+        self.x = x
+        self.y = y
         self.width = width
         self.height = height
-        self.selected = False
+        self.color = color
+        self.hover_color = hover_color
+        self.action = action  # Action to perform on click
 
-    def set_cell_value(self, value):
-        self.value = value
+    def draw(self):
+        # Get mouse position
+        mouse_x, mouse_y = pygame.mouse.get_pos()
 
-    def set_sketched_value(self, value):
-        self.sketched_value = value
+        # Check if mouse is over button
+        if self.x <= mouse_x <= self.x + self.width and self.y <= mouse_y <= self.y + self.height:
+            pygame.draw.rect(screen, self.hover_color, (self.x, self.y, self.width, self.height))
+        else:
+            pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
 
-    def draw(self, screen):
-        font = pygame.font.SysFont("comicsans", 40)
+        # Draw the text
+        text_surface = FONT.render(self.text, True, TEXT_COLOR)
+        text_rect = text_surface.get_rect(center=(self.x + self.width // 2, self.y + self.height // 2))
+        screen.blit(text_surface, text_rect)
 
-        # Draw sketched value (top left corner)
-        if self.sketched_value != 0 and self.value == 0:
-            text = font.render(str(self.sketched_value), True, (128, 128, 128))
-            screen.blit(text, (self.col * self.width + 5, self.row * self.height + 5))
+    def is_hovered(self):
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        return self.x <= mouse_x <= self.x + self.width and self.y <= mouse_y <= self.y + self.height
 
-        # Draw permanent value (centered)
-        if self.value != 0:
-            text = font.render(str(self.value), True, (0, 0, 0))
-            screen.blit(
-                text,
-                (
-                    self.col * self.width + self.width // 2 - text.get_width() // 2,
-                    self.row * self.height + self.height // 2 - text.get_height() // 2,
-                ),
-            )
-
-        # Highlight the selected cell
-        if self.selected:
-            pygame.draw.rect(
-                screen,
-                (255, 0, 0),
-                (self.col * self.width, self.row * self.height, self.width, self.height),
-                3,
-            )
-
+    def click(self):
+        if self.is_hovered() and self.action:
+            self.action()
 
 # Sudoku Generator Class
 class SudokuGenerator:
-    def __init__(self, row_length, removed_cells):
+    def __init__(self, row_length=9, removed_cells=30):
+        self.board = [[0 for _ in range(row_length)] for _ in range(row_length)]
         self.row_length = row_length
-        self.board = [[0] * row_length for _ in range(row_length)]
         self.removed_cells = removed_cells
+        self.fill_values()
 
     def get_board(self):
         return self.board
-
-    def print_board(self):
-        for row in self.board:
-            print(row)
 
     def valid_in_row(self, row, num):
         return num not in self.board[row]
@@ -68,9 +80,9 @@ class SudokuGenerator:
         return num not in [self.board[row][col] for row in range(self.row_length)]
 
     def valid_in_box(self, row_start, col_start, num):
-        for row in range(row_start, row_start + 3):
-            for col in range(col_start, col_start + 3):
-                if self.board[row][col] == num:
+        for row in range(3):
+            for col in range(3):
+                if self.board[row_start + row][col_start + col] == num:
                     return False
         return True
 
@@ -78,12 +90,11 @@ class SudokuGenerator:
         return self.valid_in_row(row, num) and self.valid_in_col(col, num) and self.valid_in_box(row - row % 3, col - col % 3, num)
 
     def fill_box(self, row_start, col_start):
-        num_list = random.sample(range(1, 10), 9)
-        idx = 0
-        for row in range(row_start, row_start + 3):
-            for col in range(col_start, col_start + 3):
-                self.board[row][col] = num_list[idx]
-                idx += 1
+        numbers = list(range(1, 10))
+        random.shuffle(numbers)
+        for i in range(3):
+            for j in range(3):
+                self.board[row_start + i][col_start + j] = numbers.pop()
 
     def fill_diagonal(self):
         for i in range(0, self.row_length, 3):
@@ -93,7 +104,7 @@ class SudokuGenerator:
         for row in range(self.row_length):
             for col in range(self.row_length):
                 if self.board[row][col] == 0:
-                    for num in random.sample(range(1, 10), 9):
+                    for num in range(1, 10):
                         if self.is_valid(row, col, num):
                             self.board[row][col] = num
                             if self.fill_remaining():
@@ -102,171 +113,115 @@ class SudokuGenerator:
                     return False
         return True
 
-    def remove_cells(self):
-        count = self.removed_cells
-        while count != 0:
-            row = random.randint(0, self.row_length - 1)
-            col = random.randint(0, self.row_length - 1)
-            if self.board[row][col] != 0:
-                self.board[row][col] = 0
-                count -= 1
-
-    def generate_sudoku(self):
+    def fill_values(self):
         self.fill_diagonal()
         self.fill_remaining()
-        self.remove_cells()
+
+    def remove_cells(self):
+        for _ in range(self.removed_cells):
+            row, col = random.randint(0, 8), random.randint(0, 8)
+            self.board[row][col] = 0
 
 
-# Board Class
-class Board:
-    def __init__(self, width, height, screen, difficulty):
-        self.width = width
-        self.height = height
-        self.rows = 9
-        self.cols = 9
-        self.screen = screen
-        self.difficulty = difficulty
-        self.board_generator = SudokuGenerator(9, difficulty)
-        self.board_generator.generate_sudoku()
-        self.board = self.board_generator.get_board()
-        self.selected_cell = None
-        self.cells = [
-            [Cell(self.board[row][col], row, col, width // self.cols, height // self.rows) for col in range(self.cols)]
-            for row in range(self.rows)
-        ]
-        self.original = [[self.board[row][col] for col in range(self.cols)] for row in range(self.rows)]
+# Main Menu Function
+def main_menu():
+    run = True
+    while run:
+        screen.fill(BACKGROUND_COLOR)
 
-    def draw(self):
-        # Draw grid lines
-        for i in range(self.rows + 1):
-            line_width = 4 if i % 3 == 0 else 1
-            pygame.draw.line(self.screen, (0, 0, 0), (0, i * self.height // self.rows), (self.width, i * self.height // self.rows), line_width)
-            pygame.draw.line(self.screen, (0, 0, 0), (i * self.width // self.cols, 0), (i * self.width // self.cols, self.height), line_width)
+        # Title Text
+        title_text = LARGE_FONT.render("Sudoku Game", True, WHITE)
+        screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 100))
 
-        # Draw cells
-        for row in self.cells:
-            for cell in row:
-                cell.draw(self.screen)
+        # Buttons for difficulty
+        easy_button = Button("Easy", WIDTH // 2 - BUTTON_WIDTH // 2, 200, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR, lambda: game_loop(difficulty=30))
+        medium_button = Button("Medium", WIDTH // 2 - BUTTON_WIDTH // 2, 300, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR, lambda: game_loop(difficulty=40))
+        hard_button = Button("Hard", WIDTH // 2 - BUTTON_WIDTH // 2, 400, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR, lambda: game_loop(difficulty=50))
 
-    def select(self, row, col):
-        if self.selected_cell:
-            self.selected_cell.selected = False
-        self.selected_cell = self.cells[row][col]
-        self.selected_cell.selected = True
-
-    def click(self, x, y):
-        if x < self.width and y < self.height:
-            row = y // (self.height // self.rows)
-            col = x // (self.width // self.cols)
-            return row, col
-        return None, None
-
-    def sketch(self, value):
-        if self.selected_cell and self.original[self.selected_cell.row][self.selected_cell.col] == 0:
-            self.selected_cell.set_sketched_value(value)
-
-    def place_number(self, value):
-        if self.selected_cell and self.original[self.selected_cell.row][self.selected_cell.col] == 0:
-            self.selected_cell.set_cell_value(value)
-            self.selected_cell.set_sketched_value(0)
-            self.update_board()
-
-    def is_full(self):
-        for row in self.cells:
-            for cell in row:
-                if cell.value == 0:
-                    return False
-        return True
-
-    def check_board(self):
-        for row in range(self.rows):
-            for col in range(self.cols):
-                num = self.cells[row][col].value
-                if num == 0 or not self.is_valid(row, col, num):
-                    return False
-        return True
-
-    def is_valid(self, row, col, num):
-        for i in range(self.cols):
-            if i != col and self.cells[row][i].value == num:
-                return False
-        for i in range(self.rows):
-            if i != row and self.cells[i][col].value == num:
-                return False
-        box_start_row, box_start_col = 3 * (row // 3), 3 * (col // 3)
-        for i in range(box_start_row, box_start_row + 3):
-            for j in range(box_start_col, box_start_col + 3):
-                if (i != row or j != col) and self.cells[i][j].value == num:
-                    return False
-        return True
-
-    def update_board(self):
-        for row in range(self.rows):
-            for col in range(self.cols):
-                self.board[row][col] = self.cells[row][col].value
-
-    def reset_to_original(self):
-        for row in range(self.rows):
-            for col in range(self.cols):
-                self.cells[row][col].set_cell_value(self.original[row][col])
-
-
-# Main function to run the game
-def main():
-    pygame.init()
-    width = 540
-    height = 540
-    screen = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Sudoku Game")
-
-    clock = pygame.time.Clock()
-    difficulty = 30  # Default to easy difficulty
-    board = Board(width, height, screen, difficulty)
-
-    running = True
-    while running:
-        screen.fill((255, 255, 255))
-
-        # Draw the board
-        board.draw()
+        easy_button.draw()
+        medium_button.draw()
+        hard_button.draw()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = event.pos
-                row, col = board.click(x, y)
-                if row is not None and col is not None:
-                    board.select(row, col)
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1:
-                    board.sketch(1)
-                elif event.key == pygame.K_2:
-                    board.sketch(2)
-                elif event.key == pygame.K_3:
-                    board.sketch(3)
-                elif event.key == pygame.K_4:
-                    board.sketch(4)
-                elif event.key == pygame.K_5:
-                    board.sketch(5)
-                elif event.key == pygame.K_6:
-                    board.sketch(6)
-                elif event.key == pygame.K_7:
-                    board.sketch(7)
-                elif event.key == pygame.K_8:
-                    board.sketch(8)
-                elif event.key == pygame.K_9:
-                    board.sketch(9)
-
-                if event.key == pygame.K_RETURN:
-                    if board.selected_cell:
-                        board.place_number(board.selected_cell.sketched_value)
+                run = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                easy_button.click()
+                medium_button.click()
+                hard_button.click()
 
         pygame.display.update()
-        clock.tick(30)
 
 
+# Game Loop
+def game_loop(difficulty):
+    # Create Sudoku puzzle
+    generator = SudokuGenerator(removed_cells=difficulty)
+    board = generator.get_board()
+
+    selected_cell = None
+    sketch = None
+    run = True
+
+    # Buttons on the game screen
+    reset_button = Button("Reset", 20, HEIGHT - 80, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR, lambda: game_loop(difficulty))
+    restart_button = Button("Restart", WIDTH // 2 - BUTTON_WIDTH // 2, HEIGHT - 80, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR, lambda: main_menu())
+    exit_button = Button("Exit", WIDTH - BUTTON_WIDTH - 20, HEIGHT - 80, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR, lambda: pygame.quit())
+
+    while run:
+        screen.fill(BACKGROUND_COLOR)
+        draw_board(board, selected_cell)
+
+        reset_button.draw()
+        restart_button.draw()
+        exit_button.draw()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                selected_cell = get_selected_cell(event.pos)
+                reset_button.click()
+                restart_button.click()
+                exit_button.click()
+            elif event.type == pygame.KEYDOWN:
+                if selected_cell is not None:
+                    row, col = selected_cell
+                    if event.key == pygame.K_RETURN and sketch is not None:  # Submit number
+                        if board[row][col] == 0:  # If not a pre-filled cell
+                            board[row][col] = sketch
+                            sketch = None  # Clear sketch
+                    elif event.key == pygame.K_BACKSPACE:  # Clear the number
+                        sketch = None
+                    elif event.unicode.isdigit() and len(event.unicode) == 1:
+                        sketch = int(event.unicode)  # Set sketch value
+
+        pygame.display.update()
+
+
+def draw_board(board, selected_cell):
+    for row in range(9):
+        for col in range(9):
+            x = col * CELL_SIZE
+            y = row * CELL_SIZE
+            pygame.draw.rect(screen, WHITE, (x, y, CELL_SIZE, CELL_SIZE), 1)
+
+            value = board[row][col]
+            if value != 0:
+                text = FONT.render(str(value), True, WHITE)
+                screen.blit(text, (x + CELL_SIZE // 3, y + CELL_SIZE // 3))
+
+            if selected_cell == (row, col):
+                pygame.draw.rect(screen, (255, 0, 0), (x, y, CELL_SIZE, CELL_SIZE), 3)
+
+
+def get_selected_cell(mouse_pos):
+    x, y = mouse_pos
+    row = y // CELL_SIZE
+    col = x // CELL_SIZE
+    return row, col
+
+
+# Run the main menu
 if __name__ == "__main__":
-    main()
+    main_menu()
